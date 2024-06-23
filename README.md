@@ -1,79 +1,41 @@
-# Foundry DeFi Stablecoin CodeHawks Audit Contest
+# GuildAudit Smart Contract Assignment
 
-<br/>
-<p align="center">
-<a href="https://codehawks.com" target="_blank">
-<img src="https://res.cloudinary.com/droqoz7lg/image/upload/v1689007253/featured/zorxcgolkzoivtb5gubq.png" width="400" alt="Code Hawks first audit">
-</a>
-</p>
-<br/>
+1. A Shadow Audit On 2023-07-foundry-defi-stablecoin Github Repository
 
-## Contest Details 
+1. Relative Stability: Anchored or pegged
+   1. Chainlink Price feed.
+   2. Set a function to exchange ETH & BTC -> $$$
+2. Stability Mechanism (Minting): Algorithmic (Decentralized)
+   1. People can only mint the stablecoin with enough collateral (coded)
+3. Collateral: Exogenous (Crypto)
+   1. wETH
+   2. wBTC
 
-- Total Prize Pool: $15,000
-  - HM Awards: $14,000
-  - LQAG Awards: $1,000
-- Starts July 24, 2023
-- Ends August 5th, 2023
-- nSLOC: 236
-- Complexity: 177
 
-## Submissions 
+- calculate health factor function
+- set health factor if debt is 0
+- Added a bunch of view function
 
-- Submit to [CodeHawks](https://www.codehawks.com/contests/cljx3b9390009liqwuedkn0m0)
+1. What are our invariants/properties?
 
-## In Scope
+# Foundry DeFi Stablecoin
 
-All contracts in `src` are in scope.
+This is a section of the Cyfrin Foundry Solidity Course.
 
-*Note on `script` folder*:
-The contracts in `script` are the scripts you can assume are going to be used to deploy and interact with the contracts. If they have an issue that will affect the overall security of the system, they are in scope. However, if they have a security issue that only affects the script and not the overall deployment of the stablecoin protocol, it is out of scope.
-
-## Scope
-```bash
-./src/
-├── DSCEngine.sol
-├── DecentralizedStableCoin.sol
-└── libraries
-    └── OracleLib.sol
-```
-
-Everything else is considered out of scope.
-
-# Known Issues
-
-The following issues can be ignored. 
-
-- A known gas issue, is that we use storage variables instead of immutables for storing the addresses of the collateral. You can ignore this. 
-
-- If the protocol ever becomes insolvent, there is _almost_ no way to recover. This is a known issue.
-
-- EDIT: August 26th, for Judging
-- We don't want the constructor marked as payable, as we like the extra protection it gives us from accidentally deploying a contract with ETH. 
-
-# Differential Tests
-
-You can find a nearly idential edition of this code in [Vyper here](https://github.com/Cyfrin/brownie-stablecoin-v23). For gas golfers, doing differential tests on these two contracts might be a great starting point. 
+[DSCEngine Example](https://sepolia.etherscan.io/address/0x091ea0838ebd5b7dda2f2a641b068d6d59639b98#code)
+[Decentralized Stablecoin Example](https://sepolia.etherscan.io/address/0xf30021646269007b0bdc0763fd736c6380602f2f#code)
 
 # About
 
-This is Lesson 12 of the[Ultimate Foundry 27-hour Solidity Course](https://www.youtube.com/watch?v=umepbfKp5rI). 
+This project is meant to be a stablecoin where users can deposit WETH and WBTC in exchange for a token that will be pegged to the USD.
 
-This project is meant to be a stablecoin where users can deposit WETH and WBTC in exchange for a token that will be pegged to the USD. The system is meant to be such that someone could fork this codebase, swap out WETH & WBTC for any basket of assets they like, and the code would work the same.
-
-
-- [Foundry DeFi Stablecoin CodeHawks Audit Contest](#foundry-defi-stablecoin-codehawks-audit-contest)
-  - [Contest Details](#contest-details)
-  - [Submissions](#submissions)
-  - [In Scope](#in-scope)
-  - [Scope](#scope)
-- [Known Issues](#known-issues)
-- [Differential Tests](#differential-tests)
+- [Foundry DeFi Stablecoin](#foundry-defi-stablecoin)
 - [About](#about)
 - [Getting Started](#getting-started)
   - [Requirements](#requirements)
   - [Quickstart](#quickstart)
     - [Optional Gitpod](#optional-gitpod)
+- [Updates](#updates)
 - [Usage](#usage)
   - [Start a local node](#start-a-local-node)
   - [Deploy](#deploy)
@@ -84,6 +46,8 @@ This project is meant to be a stablecoin where users can deposit WETH and WBTC i
   - [Scripts](#scripts)
   - [Estimate gas](#estimate-gas)
 - [Formatting](#formatting)
+- [Slither](#slither)
+- [Thank you!](#thank-you)
 
 # Getting Started
 
@@ -97,8 +61,8 @@ This project is meant to be a stablecoin where users can deposit WETH and WBTC i
 ## Quickstart
 
 ```
-git clone https://github.com/Cyfrin/foundry-defi-stablecoin-codehawks
-cd foundry-defi-stablecoin-codehawks
+git clone https://github.com/Cyfrin/foundry-defi-stablecoin-cu
+cd foundry-defi-stablecoin-cu
 forge build
 ```
 
@@ -106,7 +70,11 @@ forge build
 
 If you can't or don't want to run and install locally, you can work with this repo in Gitpod. If you do this, you can skip the `clone this repo` part.
 
-[![Open in Gitpod](https://gitpod.io/button/open-in-gitpod.svg)](https://gitpod.io/#github.com/PatrickAlphaC/foundry-smart-contract-lottery-f23)
+[![Open in Gitpod](https://gitpod.io/button/open-in-gitpod.svg)](https://gitpod.io/#github.com/PatrickAlphaC/foundry-smart-contract-lottery-cu)
+
+# Updates
+
+- The latest version of openzeppelin-contracts has changes in the ERC20Mock file. To follow along with the course, you need to install version 4.8.3 which can be done by `forge install openzeppelin/openzeppelin-contracts@v4.8.3 --no-commit` instead of `forge install openzeppelin/openzeppelin-contracts --no-commit`
 
 # Usage
 
@@ -130,14 +98,14 @@ make deploy
 
 ## Testing
 
-We talk about 4 test tiers in the video. 
+We talk about 4 test tiers in the video.
 
 1. Unit
 2. Integration
 3. Forked
 4. Staging
 
-In this repo we cover #1 and Fuzzing. 
+In this repo we cover #1 and Fuzzing.
 
 ```
 forge test
@@ -149,12 +117,11 @@ forge test
 forge coverage
 ```
 
-and for coverage based testing: 
+and for coverage based testing:
 
 ```
 forge coverage --report debug
 ```
-
 
 # Deployment to a testnet or mainnet
 
@@ -164,13 +131,13 @@ You'll want to set your `SEPOLIA_RPC_URL` and `PRIVATE_KEY` as environment varia
 
 - `PRIVATE_KEY`: The private key of your account (like from [metamask](https://metamask.io/)). **NOTE:** FOR DEVELOPMENT, PLEASE USE A KEY THAT DOESN'T HAVE ANY REAL FUNDS ASSOCIATED WITH IT.
   - You can [learn how to export it here](https://metamask.zendesk.com/hc/en-us/articles/360015289632-How-to-Export-an-Account-Private-Key).
-- `SEPOLIA_RPC_URL`: This is url of the goerli testnet node you're working with. You can get setup with one for free from [Alchemy](https://alchemy.com/?a=673c802981)
+- `SEPOLIA_RPC_URL`: This is url of the sepolia testnet node you're working with. You can get setup with one for free from [Alchemy](https://alchemy.com/?a=673c802981)
 
 Optionally, add your `ETHERSCAN_API_KEY` if you want to verify your contract on [Etherscan](https://etherscan.io/).
 
 1. Get testnet ETH
 
-Head over to [faucets.chain.link](https://faucets.chain.link/) and get some tesnet ETH. You should see the ETH show up in your metamask.
+Head over to [faucets.chain.link](https://faucets.chain.link/) and get some testnet ETH. You should see the ETH show up in your metamask.
 
 2. Deploy
 
@@ -180,11 +147,11 @@ make deploy ARGS="--network sepolia"
 
 ## Scripts
 
-Instead of scripts, we can directly use the `cast` command to interact with the contract. 
+Instead of scripts, we can directly use the `cast` command to interact with the contract.
 
 For example, on Sepolia:
 
-1. Get some WETH 
+1. Get some WETH
 
 ```
 cast send 0xdd13E55209Fd76AfE204dBda4007C227904f0a81 "deposit()" --value 0.1ether --rpc-url $SEPOLIA_RPC_URL --private-key $PRIVATE_KEY
@@ -202,7 +169,6 @@ cast send 0xdd13E55209Fd76AfE204dBda4007C227904f0a81 "approve(address,uint256)" 
 cast send 0x091EA0838eBD5b7ddA2F2A641B068d6D59639b98 "depositCollateralAndMintDsc(address,uint256,uint256)" 0xdd13E55209Fd76AfE204dBda4007C227904f0a81 100000000000000000 10000000000000000 --rpc-url $SEPOLIA_RPC_URL --private-key $PRIVATE_KEY
 ```
 
-
 ## Estimate gas
 
 You can estimate how much gas things cost by running:
@@ -211,13 +177,30 @@ You can estimate how much gas things cost by running:
 forge snapshot
 ```
 
-And you'll see and output file called `.gas-snapshot`
-
+And you'll see an output file called `.gas-snapshot`
 
 # Formatting
 
-
 To run code formatting:
+
 ```
 forge fmt
 ```
+
+# Slither
+
+```
+slither :; slither . --config-file slither.config.json
+```
+
+# Thank you!
+
+If you appreciated this, feel free to follow me or donate!
+
+ETH/zkSync/Arbitrum/Optimism Address(`cyfrin1.eth`): 0x3846c3A30E62075Fa916216b35EF04B8F53931f6
+
+[![Patrick Collins Twitter](https://img.shields.io/badge/Twitter-1DA1F2?style=for-the-badge&logo=twitter&logoColor=white)](https://twitter.com/PatrickAlphaC)
+[![Patrick Collins YouTube](https://img.shields.io/badge/YouTube-FF0000?style=for-the-badge&logo=youtube&logoColor=white)](https://www.youtube.com/channel/UCn-3f8tw_E1jZvhuHatROwA)
+[![Patrick Collins Linkedin](https://img.shields.io/badge/LinkedIn-0077B5?style=for-the-badge&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/patrickalphac/)
+[![Patrick Collins Medium](https://img.shields.io/badge/Medium-000000?style=for-the-badge&logo=medium&logoColor=white)](https://medium.com/@patrick.collins_58673/)
+

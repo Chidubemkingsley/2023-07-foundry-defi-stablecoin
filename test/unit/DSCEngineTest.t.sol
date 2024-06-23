@@ -2,20 +2,24 @@
 
 pragma solidity 0.8.19;
 
-import {DeployDSC} from "../../script/DeployDSC.s.sol";
-import {DSCEngine} from "../../src/DSCEngine.sol";
-import {DecentralizedStableCoin} from "../../src/DecentralizedStableCoin.sol";
-import {HelperConfig} from "../../script/HelperConfig.s.sol";
-import {ERC20Mock} from "@openzeppelin/contracts/mocks/ERC20Mock.sol";
-import {MockMoreDebtDSC} from "../mocks/MockMoreDebtDSC.sol";
-import {MockFailedMintDSC} from "../mocks/MockFailedMintDSC.sol";
-import {MockFailedTransferFrom} from "../mocks/MockFailedTransferFrom.sol";
-import {MockFailedTransfer} from "../mocks/MockFailedTransfer.sol";
-import {MockV3Aggregator} from "../mocks/MockV3Aggregator.sol";
-import {Test, console} from "forge-std/Test.sol";
-import {StdCheats} from "forge-std/StdCheats.sol";
+import { DeployDSC } from "../../script/DeployDSC.s.sol";
+import { DSCEngine } from "../../src/DSCEngine.sol";
+import { DecentralizedStableCoin } from "../../src/DecentralizedStableCoin.sol";
+import { HelperConfig } from "../../script/HelperConfig.s.sol";
+// import { ERC20Mock } from "@openzeppelin/contracts/mocks/ERC20Mock.sol"; Updated mock location
+import { ERC20Mock } from "../mocks/ERC20Mock.sol";
+import { MockV3Aggregator } from "../mocks/MockV3Aggregator.sol";
+import { MockMoreDebtDSC } from "../mocks/MockMoreDebtDSC.sol";
+import { MockFailedMintDSC } from "../mocks/MockFailedMintDSC.sol";
+import { MockFailedTransferFrom } from "../mocks/MockFailedTransferFrom.sol";
+import { MockFailedTransfer } from "../mocks/MockFailedTransfer.sol";
+import { Test, console } from "forge-std/Test.sol";
+import { StdCheats } from "forge-std/StdCheats.sol";
 
 contract DSCEngineTest is StdCheats, Test {
+    event CollateralRedeemed(address indexed redeemFrom, address indexed redeemTo, address token, uint256 amount); // if
+        // redeemFrom != redeemedTo, then it was liquidated
+
     DSCEngine public dsce;
     DecentralizedStableCoin public dsc;
     HelperConfig public helperConfig;
@@ -42,7 +46,7 @@ contract DSCEngineTest is StdCheats, Test {
         DeployDSC deployer = new DeployDSC();
         (dsc, dsce, helperConfig) = deployer.run();
         (ethUsdPriceFeed, btcUsdPriceFeed, weth, wbtc, deployerKey) = helperConfig.activeNetworkConfig();
-        if (block.chainid == 31337) {
+        if (block.chainid == 31_337) {
             vm.deal(user, STARTING_USER_BALANCE);
         }
         // Should we put our integration tests here?
@@ -73,7 +77,7 @@ contract DSCEngineTest is StdCheats, Test {
         feedAddresses.push(ethUsdPriceFeed);
         feedAddresses.push(btcUsdPriceFeed);
 
-        vm.expectRevert(DSCEngine.DSCEngine__TokenAddressesAndPriceFeedAddressesMustBeSameLength.selector);
+        vm.expectRevert(DSCEngine.DSCEngine__TokenAddressesAndPriceFeedAddressesAmountsDontMatch.selector);
         new DSCEngine(tokenAddresses, feedAddresses, address(dsc));
     }
 
@@ -91,7 +95,7 @@ contract DSCEngineTest is StdCheats, Test {
     function testGetUsdValue() public {
         uint256 ethAmount = 15e18;
         // 15e18 ETH * $2000/ETH = $30,000e18
-        uint256 expectedUsd = 30000e18;
+        uint256 expectedUsd = 30_000e18;
         uint256 usdValue = dsce.getUsdValue(weth, ethAmount);
         assertEq(usdValue, expectedUsd);
     }
@@ -99,6 +103,7 @@ contract DSCEngineTest is StdCheats, Test {
     ///////////////////////////////////////
     // depositCollateral Tests //
     ///////////////////////////////////////
+
     // this test needs it's own setup
     function testRevertsIfTransferFromFails() public {
         // Arrange - Setup
@@ -108,11 +113,7 @@ contract DSCEngineTest is StdCheats, Test {
         tokenAddresses = [address(mockDsc)];
         feedAddresses = [ethUsdPriceFeed];
         vm.prank(owner);
-        DSCEngine mockDsce = new DSCEngine(
-            tokenAddresses,
-            feedAddresses,
-            address(mockDsc)
-        );
+        DSCEngine mockDsce = new DSCEngine(tokenAddresses, feedAddresses, address(mockDsc));
         mockDsc.mint(user, amountCollateral);
 
         vm.prank(owner);
@@ -138,7 +139,7 @@ contract DSCEngineTest is StdCheats, Test {
     function testRevertsWithUnapprovedCollateral() public {
         ERC20Mock randToken = new ERC20Mock("RAN", "RAN", user, 100e18);
         vm.startPrank(user);
-        vm.expectRevert(DSCEngine.DSCEngine__NotAllowedToken.selector);
+        vm.expectRevert(abi.encodeWithSelector(DSCEngine.DSCEngine__TokenNotAllowed.selector, address(randToken)));
         dsce.depositCollateral(address(randToken), amountCollateral);
         vm.stopPrank();
     }
@@ -166,28 +167,6 @@ contract DSCEngineTest is StdCheats, Test {
     ///////////////////////////////////////
     // depositCollateralAndMintDsc Tests //
     ///////////////////////////////////////
-    // This test needs it's own custom setup
-    function testRevertsIfMintFails() public {
-        // Arrange - Setup
-        MockFailedMintDSC mockDsc = new MockFailedMintDSC();
-        tokenAddresses = [weth];
-        feedAddresses = [ethUsdPriceFeed];
-        address owner = msg.sender;
-        vm.prank(owner);
-        DSCEngine mockDsce = new DSCEngine(
-            tokenAddresses,
-            feedAddresses,
-            address(mockDsc)
-        );
-        mockDsc.transferOwnership(address(mockDsce));
-        // Arrange - User
-        vm.startPrank(user);
-        ERC20Mock(weth).approve(address(mockDsce), amountCollateral);
-
-        vm.expectRevert(DSCEngine.DSCEngine__MintFailed.selector);
-        mockDsce.depositCollateralAndMintDsc(weth, amountCollateral, amountToMint);
-        vm.stopPrank();
-    }
 
     function testRevertsIfMintedDscBreaksHealthFactor() public {
         (, int256 price,,,) = MockV3Aggregator(ethUsdPriceFeed).latestRoundData();
@@ -196,7 +175,7 @@ contract DSCEngineTest is StdCheats, Test {
         ERC20Mock(weth).approve(address(dsce), amountCollateral);
 
         uint256 expectedHealthFactor =
-            dsce.calculateHealthFactor(dsce.getUsdValue(weth, amountCollateral), amountToMint);
+            dsce.calculateHealthFactor(amountToMint, dsce.getUsdValue(weth, amountCollateral));
         vm.expectRevert(abi.encodeWithSelector(DSCEngine.DSCEngine__BreaksHealthFactor.selector, expectedHealthFactor));
         dsce.depositCollateralAndMintDsc(weth, amountCollateral, amountToMint);
         vm.stopPrank();
@@ -218,6 +197,24 @@ contract DSCEngineTest is StdCheats, Test {
     ///////////////////////////////////
     // mintDsc Tests //
     ///////////////////////////////////
+    // This test needs it's own custom setup
+    function testRevertsIfMintFails() public {
+        // Arrange - Setup
+        MockFailedMintDSC mockDsc = new MockFailedMintDSC();
+        tokenAddresses = [weth];
+        feedAddresses = [ethUsdPriceFeed];
+        address owner = msg.sender;
+        vm.prank(owner);
+        DSCEngine mockDsce = new DSCEngine(tokenAddresses, feedAddresses, address(mockDsc));
+        mockDsc.transferOwnership(address(mockDsce));
+        // Arrange - User
+        vm.startPrank(user);
+        ERC20Mock(weth).approve(address(mockDsce), amountCollateral);
+
+        vm.expectRevert(DSCEngine.DSCEngine__MintFailed.selector);
+        mockDsce.depositCollateralAndMintDsc(weth, amountCollateral, amountToMint);
+        vm.stopPrank();
+    }
 
     function testRevertsIfMintAmountIsZero() public {
         vm.startPrank(user);
@@ -228,18 +225,15 @@ contract DSCEngineTest is StdCheats, Test {
         vm.stopPrank();
     }
 
-    function testRevertsIfMintAmountBreaksHealthFactor() public {
+    function testRevertsIfMintAmountBreaksHealthFactor() public depositedCollateral {
         // 0xe580cc6100000000000000000000000000000000000000000000000006f05b59d3b20000
         // 0xe580cc6100000000000000000000000000000000000000000000003635c9adc5dea00000
         (, int256 price,,,) = MockV3Aggregator(ethUsdPriceFeed).latestRoundData();
         amountToMint = (amountCollateral * (uint256(price) * dsce.getAdditionalFeedPrecision())) / dsce.getPrecision();
 
         vm.startPrank(user);
-        ERC20Mock(weth).approve(address(dsce), amountCollateral);
-        dsce.depositCollateral(weth, amountCollateral);
-
         uint256 expectedHealthFactor =
-            dsce.calculateHealthFactor(dsce.getUsdValue(weth, amountCollateral), amountToMint);
+            dsce.calculateHealthFactor(amountToMint, dsce.getUsdValue(weth, amountCollateral));
         vm.expectRevert(abi.encodeWithSelector(DSCEngine.DSCEngine__BreaksHealthFactor.selector, expectedHealthFactor));
         dsce.mintDsc(amountToMint);
         vm.stopPrank();
@@ -295,11 +289,7 @@ contract DSCEngineTest is StdCheats, Test {
         tokenAddresses = [address(mockDsc)];
         feedAddresses = [ethUsdPriceFeed];
         vm.prank(owner);
-        DSCEngine mockDsce = new DSCEngine(
-            tokenAddresses,
-            feedAddresses,
-            address(mockDsc)
-        );
+        DSCEngine mockDsce = new DSCEngine(tokenAddresses, feedAddresses, address(mockDsc));
         mockDsc.mint(user, amountCollateral);
 
         vm.prank(owner);
@@ -331,6 +321,13 @@ contract DSCEngineTest is StdCheats, Test {
         vm.stopPrank();
     }
 
+    function testEmitCollateralRedeemedWithCorrectArgs() public depositedCollateral {
+        vm.expectEmit(true, true, true, true, address(dsce));
+        emit CollateralRedeemed(user, user, weth, amountCollateral);
+        vm.startPrank(user);
+        dsce.redeemCollateral(weth, amountCollateral);
+        vm.stopPrank();
+    }
     ///////////////////////////////////
     // redeemCollateralForDsc Tests //
     //////////////////////////////////
@@ -371,18 +368,20 @@ contract DSCEngineTest is StdCheats, Test {
 
     function testHealthFactorCanGoBelowOne() public depositedCollateralAndMintedDsc {
         int256 ethUsdUpdatedPrice = 18e8; // 1 ETH = $18
-        // Rememeber, we need $150 at all times if we have $100 of debt
+        // Rememeber, we need $200 at all times if we have $100 of debt
 
         MockV3Aggregator(ethUsdPriceFeed).updateAnswer(ethUsdUpdatedPrice);
 
         uint256 userHealthFactor = dsce.getHealthFactor(user);
-        // $180 collateral / 200 debt = 0.9
+        // 180*50 (LIQUIDATION_THRESHOLD) / 100 (LIQUIDATION_PRECISION) / 100 (PRECISION) = 90 / 100 (totalDscMinted) =
+        // 0.9
         assert(userHealthFactor == 0.9 ether);
     }
 
     ///////////////////////
     // Liquidation Tests //
     ///////////////////////
+
     // This test needs it's own setup
     function testMustImproveHealthFactorOnLiquidation() public {
         // Arrange - Setup
@@ -391,11 +390,7 @@ contract DSCEngineTest is StdCheats, Test {
         feedAddresses = [ethUsdPriceFeed];
         address owner = msg.sender;
         vm.prank(owner);
-        DSCEngine mockDsce = new DSCEngine(
-            tokenAddresses,
-            feedAddresses,
-            address(mockDsc)
-        );
+        DSCEngine mockDsce = new DSCEngine(tokenAddresses, feedAddresses, address(mockDsc));
         mockDsc.transferOwnership(address(mockDsce));
         // Arrange - User
         vm.startPrank(user);
@@ -459,7 +454,7 @@ contract DSCEngineTest is StdCheats, Test {
         uint256 liquidatorWethBalance = ERC20Mock(weth).balanceOf(liquidator);
         uint256 expectedWeth = dsce.getTokenAmountFromUsd(weth, amountToMint)
             + (dsce.getTokenAmountFromUsd(weth, amountToMint) / dsce.getLiquidationBonus());
-        uint256 hardCodedExpected = 6111111111111111110;
+        uint256 hardCodedExpected = 6_111_111_111_111_111_110;
         assertEq(liquidatorWethBalance, hardCodedExpected);
         assertEq(liquidatorWethBalance, expectedWeth);
     }
@@ -473,7 +468,7 @@ contract DSCEngineTest is StdCheats, Test {
         uint256 expectedUserCollateralValueInUsd = dsce.getUsdValue(weth, amountCollateral) - (usdAmountLiquidated);
 
         (, uint256 userCollateralValueInUsd) = dsce.getAccountInformation(user);
-        uint256 hardCodedExpectedValue = 70000000000000000020;
+        uint256 hardCodedExpectedValue = 70_000_000_000_000_000_020;
         assertEq(userCollateralValueInUsd, expectedUserCollateralValueInUsd);
         assertEq(userCollateralValueInUsd, hardCodedExpectedValue);
     }
@@ -539,6 +534,12 @@ contract DSCEngineTest is StdCheats, Test {
     function testGetDsc() public {
         address dscAddress = dsce.getDsc();
         assertEq(dscAddress, address(dsc));
+    }
+
+    function testLiquidationPrecision() public {
+        uint256 expectedLiquidationPrecision = 100;
+        uint256 actualLiquidationPrecision = dsce.getLiquidationPrecision();
+        assertEq(actualLiquidationPrecision, expectedLiquidationPrecision);
     }
 
     // How do we adjust our invariant tests for this?
